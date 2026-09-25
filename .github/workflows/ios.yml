@@ -1,0 +1,66 @@
+name: iOS Build (unsigned IPA)
+
+# 云端 macOS 编译，产出未签名 IPA，供手机端签名工具导入后自行签名
+# 本流水线不需要任何证书 Secret
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-14
+    env:
+      GODOT_VERSION: 4.2.2
+      PROJECT_NAME: FlappyDemo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Godot editor (macOS)
+        run: |
+          curl -L -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_macos.universal.zip"
+          unzip -q godot.zip
+          chmod +x Godot.app/Contents/MacOS/Godot
+
+      - name: Install Godot export templates
+        run: |
+          curl -L -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          TPL_DIR="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$TPL_DIR"
+          unzip -q templates.tpz -d tmp_tpl
+          mv tmp_tpl/templates/* "$TPL_DIR/"
+
+      - name: Export Xcode project
+        run: |
+          mkdir -p build
+          ./Godot.app/Contents/MacOS/Godot --headless --path . --export-release "iOS" build/game.zip
+          mkdir -p build/xcode
+          unzip -q build/game.zip -d build/xcode
+          find build/xcode -maxdepth 2 -name "*.xcodeproj"
+
+      - name: Build unsigned .app
+        run: |
+          cd build/xcode
+          PROJ=$(find . -maxdepth 2 -name "*.xcodeproj" | head -1)
+          echo "project: $PROJ"
+          SCHEME=$(basename "$PROJ" .xcodeproj)
+          xcodebuild -project "$PROJ" -list
+          COMMON_FLAGS="-configuration Release -sdk iphoneos -archivePath $PWD/../game.xcarchive archive CODE_SIGN_IDENTITY= CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO"
+          xcodebuild -project "$PROJ" -scheme "$SCHEME" $COMMON_FLAGS 2>&1 | tail -30 \
+            || xcodebuild -project "$PROJ" -target "$SCHEME" $COMMON_FLAGS 2>&1 | tail -30
+
+      - name: Package unsigned IPA
+        run: |
+          cd build
+          mkdir -p Payload
+          cp -R game.xcarchive/Products/Applications/*.app Payload/
+          zip -qry "${PROJECT_NAME}-unsigned.ipa" Payload
+          ls -lh "${PROJECT_NAME}-unsigned.ipa"
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-ipa
+          path: build/*.ipa
+          retention-days: 30

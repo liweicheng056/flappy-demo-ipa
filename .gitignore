@@ -1,0 +1,7 @@
+.godot/
+build/
+*.ipa
+*.p12
+*.mobileprovision
+.import/
+export.cfg
