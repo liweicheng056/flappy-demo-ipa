@@ -8,6 +8,7 @@ config_version=5
 config/name="FlappyDemo"
 config/description="Flappy Bird clone demo for iOS signing pipeline"
 run/main_scene="res://scenes/main.tscn"
+config/icon="res://icon.png"
 config/features=PackedStringArray("4.2", "Mobile")
 
 [display]
