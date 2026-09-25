@@ -38,19 +38,23 @@ jobs:
       - name: Export Xcode project
         run: |
           mkdir -p build
-          ./Godot.app/Contents/MacOS/Godot --headless --path . --export-release "iOS" build/game.zip
-          mkdir -p build/xcode
-          unzip -q build/game.zip -d build/xcode
-          find build/xcode -maxdepth 2 -name "*.xcodeproj"
+          ./Godot.app/Contents/MacOS/Godot --headless --path . --export-release "iOS" build/game.zip 2>&1 | tail -40
+          if [ -f build/game.zip ]; then
+            mkdir -p build/xcode
+            unzip -q build/game.zip -d build/xcode
+          fi
+          find build -maxdepth 4 -name "*.xcodeproj"
 
       - name: Build unsigned .app
         run: |
-          cd build/xcode
-          PROJ=$(find . -maxdepth 2 -name "*.xcodeproj" | head -1)
+          PROJ=$(find build -maxdepth 4 -name "*.xcodeproj" | head -1)
+          cd "$(dirname "$PROJ")"
+          PROJ=$(basename "$PROJ")
           echo "project: $PROJ"
           SCHEME=$(basename "$PROJ" .xcodeproj)
           xcodebuild -project "$PROJ" -list
-          COMMON_FLAGS="-configuration Release -sdk iphoneos -archivePath $PWD/../game.xcarchive archive CODE_SIGN_IDENTITY= CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO"
+          ARCHIVE="$GITHUB_WORKSPACE/build/game.xcarchive"
+          COMMON_FLAGS="-configuration Release -sdk iphoneos -archivePath $ARCHIVE archive CODE_SIGN_IDENTITY= CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO"
           xcodebuild -project "$PROJ" -scheme "$SCHEME" $COMMON_FLAGS 2>&1 | tail -30 \
             || xcodebuild -project "$PROJ" -target "$SCHEME" $COMMON_FLAGS 2>&1 | tail -30
 
