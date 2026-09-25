@@ -26,10 +26,14 @@ jobs:
       - name: Install Godot export templates
         run: |
           curl -L -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          ls -lh templates.tpz
+          unzip -q templates.tpz -d tmp_tpl
           TPL_DIR="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable"
           mkdir -p "$TPL_DIR"
-          unzip -q templates.tpz -d tmp_tpl
-          mv tmp_tpl/templates/* "$TPL_DIR/"
+          find tmp_tpl -name "*.zip" -exec cp -n {} "$TPL_DIR/" \;
+          echo "--- templates dir ---"
+          ls -lh "$TPL_DIR"
+          test -f "$TPL_DIR/ios.zip" || { echo "ios.zip 缺失，列出解压结构："; find tmp_tpl -maxdepth 3 | head -40; exit 1; }
 
       - name: Export Xcode project
         run: |
